@@ -10,7 +10,17 @@
 #
 .SUFFIXES : .ml .mli .cmo .cmi .cmx .mly
 
-INSTALL_DIR=/usr/local
+INSTALL_DIR = /opt/homebrew
+ifeq ($(UNAME),Darwin)
+ifneq ($(ARCH),arm64)
+INSTALL_DIR ?= /usr/local
+else
+INSTALL_DIR ?= /opt/homebrew
+endif
+else
+INSTALL_DIR ?= /usr/local
+endif
+
 INSTALL_BIN_DIR=$(INSTALL_DIR)/bin
 INSTALL_LIB_DIR=$(INSTALL_DIR)/lib/haxe
 INSTALL_STD_DIR=$(INSTALL_DIR)/share/haxe/std

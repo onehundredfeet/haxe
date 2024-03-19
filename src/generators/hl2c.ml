@@ -1072,7 +1072,8 @@ let generate_function ctx f =
 			(* insert end switch *)
 			output_at2 pend ([OODecreaseIndent;OODecreaseIndent;OOEndBlock] @ List.rev old);
 		| ONullCheck r ->
-			sexpr "if( %s == NULL ) hl_null_access()" (reg r)
+			(* sexpr "if( %s == NULL ) hl_null_access()" (reg r) *)
+			()
 		| OTrap (r,d) ->
 			sexpr "hl_trap(trap$%d,%s,%s)" !trap_depth (reg r) (label d);
 			incr trap_depth
@@ -1478,6 +1479,10 @@ let write_c com file (code:code) gnames =
 	List.iter (fun name -> define ctx (sprintf "typedef struct _%s %s;" name name)) abstracts;
 	define ctx "";
 	line "// Natives functions";
+	line "#ifdef _HL_EXT_NATIVES";
+	line "#include _HL_EXT_NATIVES";
+	line "#endif";
+
 	let native_libs = Hashtbl.create 0 in
 	let sorted_natives = Array.copy code.natives in
 	Array.sort (fun n1 n2 -> let mk (lib,name,_,_) = code.strings.(lib), code.strings.(name) in compare (mk n1) (mk n2)) sorted_natives;
