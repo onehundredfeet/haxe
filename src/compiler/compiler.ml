@@ -163,6 +163,9 @@ module Setup = struct
 			| Eval ->
 				add_std "eval";
 				"eval"
+			| V ->
+				add_std "v";
+				"v"
 
 	let init_native_libs com native_libs =
 		(* Native lib pass 1: Register *)

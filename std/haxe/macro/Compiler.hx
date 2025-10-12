@@ -644,6 +644,7 @@ enum Platform {
 	Python;
 	Hl;
 	Eval;
+	V;
 	CustomTarget(name:String);
 }
 

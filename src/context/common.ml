@@ -474,6 +474,7 @@ let short_platform_name = function
 	| Python -> "py"
 	| Hl -> "hl"
 	| Eval -> "evl"
+	| V -> "v"
 	| CustomTarget n -> "c_" ^ n
 
 let stats =
@@ -711,6 +712,21 @@ let get_config com =
 			pf_uses_utf16 = false;
 			pf_supports_threads = true;
 			pf_capture_policy = CPWrapRef;
+			pf_exceptions = { default_config.pf_exceptions with
+				ec_avoid_wrapping = false
+			};
+			pf_supports_atomics = true;
+		}
+	| V ->
+		{
+			default_config with
+			pf_static = true;
+			pf_sys = true;
+			pf_pad_nulls = false;
+			pf_uses_utf16 = false;
+			pf_supports_threads = true;
+			pf_capture_policy = CPNone;
+			pf_reserved_type_paths = [];
 			pf_exceptions = { default_config.pf_exceptions with
 				ec_avoid_wrapping = false
 			};

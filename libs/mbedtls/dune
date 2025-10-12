@@ -4,6 +4,7 @@
 	(name mbedtls)
 	(foreign_stubs
 		(language c)
+		(flags (:standard -I/opt/homebrew/include))
 		(names mbedtls_stubs))
 	(wrapped false)
 )

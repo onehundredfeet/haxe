@@ -99,6 +99,9 @@ let parse_args com =
 		("Target",["--hl"],["-hl"],Arg.String (fun file ->
 			set_platform com Hl file;
 		),"<file>","generate HashLink .hl bytecode or .c code into target file");
+		("Target",["--vlang"],["--vlang"],Arg.String (fun file ->
+			set_platform com V file;
+		),"<file>","generate V language code into target file");
 		("Target",["--custom-target"],["-custom"],Arg.String (fun target ->
 			let name, path = try let split = ExtString.String.split target "=" in split with _ -> target, "" in
 			set_custom_target com name path;

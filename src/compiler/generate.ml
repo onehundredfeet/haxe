@@ -181,6 +181,8 @@ let generate ctx tctx ext actx =
 			Genjvm.generate actx.jvm_flag,"jvm"
 		| Python ->
 			Genpy.generate,"python"
+		| V ->
+			Genv.generate,"v"
 		| Hl ->
 			Genhl.generate,"hl"
 		| Eval ->
