@@ -105,12 +105,35 @@ let v_escape_string s =
 	done;
 	Buffer.contents b
 
-let v_ident s =
+let snake_case s =
+	let result = Buffer.create (String.length s) in
+	for i = 0 to String.length s - 1 do
+		let c = s.[i] in
+		if i > 0 && c >= 'A' && c <= 'Z' then
+			Buffer.add_char result '_';
+		Buffer.add_char result (Char.lowercase_ascii c)
+	done;
+	Buffer.contents result
+
+let v_function_name s =
+	let s = snake_case s in
 	match s with
 	| "fn" | "struct" | "enum" | "interface" | "type" | "const" | "mut" 
 	| "pub" | "import" | "module" | "for" | "if" | "else" | "match"
 	| "go" | "return" | "defer" | "unsafe" | "union" | "shared" -> s ^ "_"
 	| _ -> s
+
+let v_struct_name s =
+	(* Struct names need to be capitalized in V *)
+	let s = String.capitalize_ascii s in
+	match s with
+	| "Fn" | "Struct" | "Enum" | "Interface" | "Type" | "Const" | "Mut" 
+	| "Pub" | "Import" | "Module" | "For" | "If" | "Else" | "Match"
+	| "Go" | "Return" | "Defer" | "Unsafe" | "Union" | "Shared" -> s ^ "_"
+	| _ -> s
+
+let v_ident s =
+	snake_case s
 
 let rec gen_value ctx e =
 	match e.eexpr with
@@ -140,17 +163,71 @@ let rec gen_value ctx e =
 		print ctx ".";
 		print ctx (v_ident (field_name f))
 	| TCall (e,el) ->
-		(* Special handling for trace calls *)
+		(* Handle different types of function calls *)
 		(match e.eexpr with
-		| TField ({eexpr = TTypeExpr (TClassDecl {cl_path = ([],"Log")})}, _) ->
-			print ctx "println(";
-			concat ctx " + " (fun e ->
-				match e.eexpr with
-				| TConst (TString s) -> print ctx ("'" ^ v_escape_string s ^ "'")
-				| _ -> gen_value ctx e
-			) el;
-			print ctx ")"
+		| TField (obj, field) ->
+			(match obj.eexpr, field with
+			| TTypeExpr (TClassDecl {cl_path = (["haxe"],"Log")}), FStatic (_, {cf_name = "trace"}) -> 
+				(* Handle trace() calls - convert to println *)
+				(match el with
+				| arg :: _ ->
+					print ctx "println(";
+					(match arg.eexpr with
+					| TConst (TString s) -> print ctx ("'" ^ v_escape_string s ^ "'")
+					| TBinop (OpAdd, e1, e2) ->
+						(* Check if this is actually string concatenation or numeric addition *)
+						let is_string_concat = 
+							let rec contains_string e =
+								match e.eexpr with
+								| TConst (TString _) -> true
+								| TBinop (OpAdd, e1, e2) -> contains_string e1 || contains_string e2
+								| _ -> false
+							in
+							contains_string arg
+						in
+						if is_string_concat then (
+							(* Handle string concatenation in trace *)
+							let rec gen_concat e =
+								match e.eexpr with
+								| TBinop (OpAdd, e1, e2) ->
+									gen_concat e1;
+									print ctx " + ";
+									gen_concat e2
+								| TConst (TString s) -> print ctx ("'" ^ v_escape_string s ^ "'")
+								| TConst (TInt i) -> print ctx ("'" ^ Int32.to_string i ^ "'")
+								| TConst (TFloat f) -> print ctx ("'" ^ f ^ "'")
+								| TLocal v -> print ctx (v_ident v.v_name ^ ".str()")
+								| _ -> 
+									print ctx "(";
+									gen_value ctx e;
+									print ctx ").str()"
+							in
+							gen_concat arg
+						) else (
+							(* Regular arithmetic - just generate normally *)
+							gen_value ctx arg
+						)
+					| _ -> gen_value ctx arg);
+					print ctx ")"
+				| [] -> 
+					print ctx "println('empty trace')")
+			| TTypeExpr (TClassDecl c), FStatic (_, {cf_name = "main"}) ->
+				(* Handle static main method call - generate the main body directly *)
+				(try
+					let main_field = PMap.find "main" c.cl_statics in
+					(match main_field.cf_expr with
+					| Some {eexpr = TFunction tf} -> gen_value ctx tf.tf_expr
+					| _ -> print ctx "// no main body found")
+				with Not_found -> print ctx "// main method not found")
+			| _ ->
+				(* Default function call handling *)
+				gen_value ctx e;
+				print ctx "(";
+				concat ctx ", " (gen_value ctx) el;
+				print ctx ")"
+			)
 		| _ ->
+			(* Other types of calls *)
 			gen_value ctx e;
 			print ctx "(";
 			concat ctx ", " (gen_value ctx) el;
@@ -189,8 +266,21 @@ let rec gen_value ctx e =
 		b();
 		print ctx ctx.tabs;
 		print ctx "}"
+	| TTypeExpr _ ->
+		print ctx "// type expression"
+	| TVar (v,eo) ->
+		print ctx (v_ident v.v_name);
+		print ctx " := ";
+		(match eo with
+		| None -> print ctx "0" (* Default initialization *)
+		| Some e -> gen_value ctx e)
+	| TParenthesis e ->
+		print ctx "(";
+		gen_value ctx e;
+		print ctx ")"
 	| _ ->
-		print ctx "println('Hello from V!')"
+		print ctx "// TODO: ";
+		print ctx (Type.s_expr_kind e)
 
 and gen_const ctx c pos =
 	match c with
@@ -267,7 +357,7 @@ let gen_class_field ctx c f =
 
 let gen_class ctx c =
 	print ctx "struct ";
-	print ctx (v_ident (snd c.cl_path));
+	print ctx (v_struct_name (snd c.cl_path));
 	print ctx " {\n";
 	let b = open_block ctx in
 	
@@ -285,9 +375,9 @@ let gen_class ctx c =
 				() (* Don't generate method - will be handled by main function *)
 			else begin
 				print ctx "fn (self &";
-				print ctx (v_ident (snd c.cl_path));
+				print ctx (v_struct_name (snd c.cl_path));
 				print ctx ") ";
-				print ctx (v_ident f.cf_name);
+				print ctx (v_function_name f.cf_name);
 				print ctx "(";
 				concat ctx ", " (fun (v,_) ->
 					print ctx (v_ident v.v_name);
@@ -310,7 +400,7 @@ let gen_class ctx c =
 
 let gen_enum ctx e =
 	print ctx "enum ";
-	print ctx (v_ident (snd e.e_path));
+	print ctx (v_struct_name (snd e.e_path));
 	print ctx " {\n";
 	let b = open_block ctx in
 	
@@ -333,8 +423,15 @@ let gen_enum ctx e =
 	b();
 	print ctx "}\n\n"
 
+let should_generate_class c =
+	match c.cl_path with
+	(* Only generate classes from the root package that are not standard library classes *)
+	| ([], name) when not (List.mem name ["Std"; "Log"; "PosException"; "ArrayIterator"; "String"; "StringTools"]) -> true
+	| (pack, _) when pack <> [] && (List.hd pack = "haxe" || List.hd pack = "sys") -> false
+	| _ -> true
+
 let generate_type ctx = function
-	| TClassDecl c when not (has_class_flag c CInterface) && not (has_class_flag c CExtern) ->
+	| TClassDecl c when not (has_class_flag c CInterface) && not (has_class_flag c CExtern) && should_generate_class c ->
 		gen_class ctx c
 	| TEnumDecl e when not (has_enum_flag e EnExtern) ->
 		gen_enum ctx e
