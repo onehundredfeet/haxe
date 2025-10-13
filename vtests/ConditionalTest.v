@@ -5,9 +5,6 @@ module main
 struct ConditionalTest {
 }
 
-struct Std {
-}
-
 fn main() {
 	{
 		x := 10

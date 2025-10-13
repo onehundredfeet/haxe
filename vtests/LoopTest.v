@@ -5,9 +5,6 @@ module main
 struct LoopTest {
 }
 
-struct Std {
-}
-
 fn main() {
 	{
 		println('Iteration: ' + '0')

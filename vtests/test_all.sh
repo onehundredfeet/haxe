@@ -8,7 +8,7 @@ export HAXE_STD_PATH=/Users/rcleven/git/haxev/std
 echo "V Language Test Suite"
 echo "===================="
 
-tests=("BasicTest" "ArithmeticTest" "StringTest" "ConditionalTest" "LoopTest")
+tests=("BasicTest" "ArithmeticTest" "StringTest" "ConditionalTest" "LoopTest" "ArrayTest")
 
 for test in "${tests[@]}"; do
     echo

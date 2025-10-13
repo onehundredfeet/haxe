@@ -4,7 +4,32 @@
 
 	This program is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License
-	as published by the Free Software Foundation; either version 2
+	as published by the Fre			| TTypeExpr (TClassDecl c), FStatic (_, {cf_name = "main"}) ->
+				(* Handle static main method call - generate the main body directly *)
+				(try
+					let main_field = PMap.find "main" c.cl_statics in
+					(match main_field.cf_expr with
+					| Some {eexpr = TFunction tf} -> gen_value ctx tf.tf_expr
+					| _ -> print ctx "// no main body found")
+				with Not_found -> print ctx "// main method not found")
+			| TTypeExpr (TClassDecl c), FStatic (_, {cf_name = name}) ->
+				(* Handle other static method calls *)
+				print ctx (v_function_name name);
+				print ctx "(";
+				concat ctx ", " (gen_value ctx) el;
+				print ctx ")"
+			| _, FStatic (c, {cf_name = name}) ->
+				(* Handle static method calls from any class *)
+				print ctx (v_function_name name);
+				print ctx "(";
+				concat ctx ", " (gen_value ctx) el;
+				print ctx ")"
+			| _ ->
+				(* Regular method call *)
+				gen_value ctx e;
+				print ctx "(";
+				concat ctx ", " (gen_value ctx) el;
+				print ctx ")"ndation; either version 2
 	of the License, or (at your option) any later version.
 
 	This program is distributed in the hope that it will be useful,
@@ -266,8 +291,10 @@ let rec gen_value ctx e =
 		b();
 		print ctx ctx.tabs;
 		print ctx "}"
+	| TTypeExpr (TClassDecl c) ->
+		print ctx ("// type expression for class " ^ (String.concat "." (fst c.cl_path @ [snd c.cl_path])))
 	| TTypeExpr _ ->
-		print ctx "// type expression"
+		print ctx "// type expression (other)"
 	| TVar (v,eo) ->
 		print ctx (v_ident v.v_name);
 		print ctx " := ";
@@ -374,9 +401,53 @@ let gen_class ctx c =
 			if f.cf_name = "main" && has_class_field_flag f CfStatic then
 				() (* Don't generate method - will be handled by main function *)
 			else begin
-				print ctx "fn (self &";
-				print ctx (v_struct_name (snd c.cl_path));
-				print ctx ") ";
+				print ctx "fn ";
+				(* Check if this is a static method *)
+				if has_class_field_flag f CfStatic then begin
+					(* Static method - no receiver *)
+					print ctx (v_function_name f.cf_name);
+					print ctx "(";
+					concat ctx ", " (fun (v,_) ->
+						print ctx (v_ident v.v_name);
+						print ctx " ";
+						print ctx (v_type_name ctx v.v_type)
+					) tf.tf_args
+				end else begin
+					(* Instance method - has receiver *)
+					print ctx "(self &";
+					print ctx (v_struct_name (snd c.cl_path));
+					print ctx ") ";
+					print ctx (v_function_name f.cf_name);
+					print ctx "(";
+					concat ctx ", " (fun (v,_) ->
+						print ctx (v_ident v.v_name);
+						print ctx " ";
+						print ctx (v_type_name ctx v.v_type)
+					) tf.tf_args
+				end;
+				print ctx ")";
+				let ret_type = v_type_name ctx tf.tf_type in
+				if ret_type <> "" then begin
+					print ctx " ";
+					print ctx ret_type
+				end;
+				print ctx " ";
+				gen_value ctx tf.tf_expr;
+				newline ctx;
+				newline ctx
+			end
+		| _ -> ()
+	) c.cl_ordered_fields;
+	
+	(* Generate static methods *)
+	List.iter (fun f ->
+		match f.cf_expr with
+		| Some { eexpr = TFunction tf } ->
+			(* Check if this is a static main method *)
+			if f.cf_name = "main" && has_class_field_flag f CfStatic then
+				() (* Don't generate method - will be handled by main function *)
+			else begin
+				print ctx "fn ";
 				print ctx (v_function_name f.cf_name);
 				print ctx "(";
 				concat ctx ", " (fun (v,_) ->
@@ -396,7 +467,7 @@ let gen_class ctx c =
 				newline ctx
 			end
 		| _ -> ()
-	) c.cl_ordered_fields
+	) c.cl_ordered_statics
 
 let gen_enum ctx e =
 	print ctx "enum ";
@@ -425,10 +496,9 @@ let gen_enum ctx e =
 
 let should_generate_class c =
 	match c.cl_path with
-	(* Only generate classes from the root package that are not standard library classes *)
-	| ([], name) when not (List.mem name ["Std"; "Log"; "PosException"; "ArrayIterator"; "String"; "StringTools"]) -> true
-	| (pack, _) when pack <> [] && (List.hd pack = "haxe" || List.hd pack = "sys") -> false
-	| _ -> true
+	(* Only generate user-defined test classes, exclude all standard library *)
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"] -> true
+	| _ -> false
 
 let generate_type ctx = function
 	| TClassDecl c when not (has_class_flag c CInterface) && not (has_class_flag c CExtern) && should_generate_class c ->

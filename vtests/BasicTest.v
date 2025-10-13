@@ -5,9 +5,6 @@ module main
 struct BasicTest {
 }
 
-struct Std {
-}
-
 fn main() {
 	{
 		println('Hello V World')

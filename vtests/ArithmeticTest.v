@@ -5,9 +5,6 @@ module main
 struct ArithmeticTest {
 }
 
-struct Std {
-}
-
 fn main() {
 	{
 		a := 10
