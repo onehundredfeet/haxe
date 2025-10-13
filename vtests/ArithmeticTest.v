@@ -7,8 +7,8 @@ struct ArithmeticTest {
 
 fn main() {
 	{
-		a := 10
-		b := 5
+		mut a := 10
+		mut b := 5
 		println(a + b)
 		println(a - b)
 		println(a * b)

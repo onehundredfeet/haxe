@@ -176,11 +176,15 @@ let rec gen_value ctx e =
 		print ctx " ";
 		gen_value ctx e2
 	| TUnop (op,flag,e) ->
-		(match flag with
-		| Prefix ->
+		(match op, flag with
+		| Increment, Prefix | Decrement, Prefix ->
+			(* V only supports postfix increment/decrement, convert prefix to postfix *)
+			gen_value ctx e;
+			gen_unop ctx op
+		| _, Prefix ->
 			gen_unop ctx op;
 			gen_value ctx e
-		| Postfix ->
+		| _, Postfix ->
 			gen_value ctx e;
 			gen_unop ctx op)
 	| TField (e,f) ->
@@ -291,11 +295,10 @@ let rec gen_value ctx e =
 		b();
 		print ctx ctx.tabs;
 		print ctx "}"
-	| TTypeExpr (TClassDecl c) ->
-		print ctx ("// type expression for class " ^ (String.concat "." (fst c.cl_path @ [snd c.cl_path])))
 	| TTypeExpr _ ->
-		print ctx "// type expression (other)"
+		print ctx "// TODO: type expression"
 	| TVar (v,eo) ->
+		print ctx "mut ";
 		print ctx (v_ident v.v_name);
 		print ctx " := ";
 		(match eo with
@@ -305,6 +308,11 @@ let rec gen_value ctx e =
 		print ctx "(";
 		gen_value ctx e;
 		print ctx ")"
+	| TWhile (e1,e2,flag) ->
+		print ctx "for ";
+		gen_value ctx e1;
+		print ctx " ";
+		gen_value ctx e2
 	| _ ->
 		print ctx "// TODO: ";
 		print ctx (Type.s_expr_kind e)
@@ -331,15 +339,15 @@ and gen_binop ctx = function
 	| OpGte -> print ctx ">="
 	| OpLt -> print ctx "<"
 	| OpLte -> print ctx "<="
-	| OpAnd -> print ctx "&&"
-	| OpOr -> print ctx "||"
+	| OpAnd -> print ctx "&"
+	| OpOr -> print ctx "|"
 	| OpMod -> print ctx "%"
 	| OpShl -> print ctx "<<"
 	| OpShr -> print ctx ">>"
 	| OpUShr -> print ctx ">>"
 	| OpXor -> print ctx "^"
-	| OpBoolAnd -> print ctx "&"
-	| OpBoolOr -> print ctx "|"
+	| OpBoolAnd -> print ctx "&&"
+	| OpBoolOr -> print ctx "||"
 	| OpAssignOp op -> gen_binop ctx op; print ctx "="
 	| OpInterval -> print ctx ".."
 	| OpArrow -> print ctx "=>"
@@ -497,7 +505,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function

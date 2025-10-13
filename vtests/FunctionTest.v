@@ -9,13 +9,6 @@ fn greet(name string) string {
 	return "Hello " + name
 }
 
-struct Std {
-}
-
-fn string(s voidptr) string {
-	return s.str()
-}
-
 fn main() {
 	{
 		result := // type expression for class FunctionTest.greet("V World")

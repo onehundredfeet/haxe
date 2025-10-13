@@ -7,12 +7,12 @@ struct ArrayTest {
 
 fn main() {
 	{
-		numbers_0 := 1
-		numbers_1 := 2
-		numbers_2 := 3
-		numbers_3 := 4
-		numbers_4 := 5
-		first := numbers_0
+		mut numbers_0 := 1
+		mut numbers_1 := 2
+		mut numbers_2 := 3
+		mut numbers_3 := 4
+		mut numbers_4 := 5
+		mut first := numbers_0
 		println('First number: ' + first.str())
 	}
 }

@@ -7,7 +7,7 @@ struct StringTest {
 
 fn main() {
 	{
-		name := "World"
+		mut name := "World"
 		println('Hello ' + name.str())
 	}
 }
