@@ -9,10 +9,10 @@ fn main() {
 	{
 		mut is_true := true
 		mut is_false := false
-		if (is_true && !is_false) {
+		if is_true && !is_false {
 			println('Logic works!')
 }
-		if (is_true || is_false) {
+		if is_true || is_false {
 			println('OR logic works!')
 }
 	}

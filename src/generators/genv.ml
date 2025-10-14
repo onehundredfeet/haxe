@@ -104,9 +104,14 @@ let rec v_type_name ctx t =
 	| TInst ({ cl_path = [],"Bool" },_) -> "bool"
 	| TInst ({ cl_path = [],"String" },_) -> "string"
 	| TInst ({ cl_path = [],"Array" },[t]) -> Printf.sprintf "[]%s" (v_type_name ctx t)
-	| TInst ({ cl_path = path },_) -> s_path path
+	| TInst ({ cl_path = path },_) -> 
+		let path_str = s_path path in
+		Printf.sprintf "%s" path_str
 	| TEnum ({ e_path = path },_) -> s_path path
 	| TAbstract ({ a_path = [],"Void" },_) -> ""
+	| TAbstract ({ a_path = [],"Int" },_) -> "int"
+	| TAbstract ({ a_path = [],"Float" },_) -> "f64"
+	| TAbstract ({ a_path = [],"Bool" },_) -> "bool"
 	| TAbstract ({ a_path = path },_) -> s_path path
 	| TType ({ t_path = path },_) -> s_path path
 	| TDynamic _ -> "voidptr"
@@ -160,7 +165,13 @@ let v_struct_name s =
 let v_ident s =
 	snake_case s
 
-let rec gen_value ctx e =
+let rec gen_condition ctx e =
+	(* Generate condition without unnecessary parentheses for V if statements *)
+	match e.eexpr with
+	| TParenthesis inner -> gen_condition ctx inner  (* Skip parentheses for conditions *)
+	| _ -> gen_value ctx e
+
+and gen_value ctx e =
 	match e.eexpr with
 	| TConst c -> gen_const ctx c e.epos
 	| TLocal v -> print ctx (v_ident v.v_name)
@@ -280,7 +291,7 @@ let rec gen_value ctx e =
 		| Some e -> print ctx " "; gen_value ctx e)
 	| TIf (e,e1,e2) ->
 		print ctx "if ";
-		gen_value ctx e;
+		gen_condition ctx e;
 		print ctx " {\n";
 		let b = open_block ctx in
 		print ctx ctx.tabs;
@@ -522,7 +533,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function

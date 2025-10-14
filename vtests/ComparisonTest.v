@@ -9,13 +9,13 @@ fn main() {
 	{
 		mut a := 10
 		mut b := 20
-		if (a < b) {
+		if a < b {
 			println('a is less than b')
 }
-		if (a == 10) {
+		if a == 10 {
 			println('a equals 10')
 }
-		if (b != a) {
+		if b != a {
 			println('b is not equal to a')
 }
 	}
