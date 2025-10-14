@@ -401,6 +401,35 @@ and gen_value ctx e =
 			gen_params 0 el
 		end;
 		print ctx " }"
+	| TSwitch switch ->
+		(* Generate match expression for V *)
+		print ctx "match ";
+		gen_condition ctx switch.switch_subject;
+		print ctx " {\n";
+		let b = open_block ctx in
+		
+		(* Generate each case *)
+		List.iter (fun case ->
+			print ctx ctx.tabs;
+			(* Generate case patterns *)
+			concat ctx ", " (gen_value ctx) case.case_patterns;
+			print ctx " { ";
+			gen_value ctx case.case_expr;
+			print ctx " }\n"
+		) switch.switch_cases;
+		
+		(* Generate default case if present *)
+		(match switch.switch_default with
+		| Some default_expr ->
+			print ctx ctx.tabs;
+			print ctx "else { ";
+			gen_value ctx default_expr;
+			print ctx " }\n"
+		| None -> ());
+		
+		b();
+		print ctx ctx.tabs;
+		print ctx "}"
 	| _ ->
 		print ctx "// TODO: ";
 		print ctx (Type.s_expr_kind e)
@@ -593,7 +622,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function
