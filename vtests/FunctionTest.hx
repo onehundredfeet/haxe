@@ -1,6 +1,6 @@
 class FunctionTest {
     static function greet(name: String): String {
-        return "Hello " + name;
+        return "Hello, " + name + "!";
     }
     
     static function main() {

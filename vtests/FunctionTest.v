@@ -6,12 +6,12 @@ struct FunctionTest {
 }
 
 fn greet(name string) string {
-	return "Hello " + name
+	return "Hello, " + name + "!"
 }
 
 fn main() {
 	{
-		result := // type expression for class FunctionTest.greet("V World")
+		mut result := greet("V World")
 		println(result)
 	}
 }

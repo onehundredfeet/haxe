@@ -248,6 +248,18 @@ let rec gen_value ctx e =
 					| Some {eexpr = TFunction tf} -> gen_value ctx tf.tf_expr
 					| _ -> print ctx "// no main body found")
 				with Not_found -> print ctx "// main method not found")
+			| TTypeExpr (TClassDecl c), FStatic (_, {cf_name = name}) ->
+				(* Handle other static method calls *)
+				print ctx (v_function_name name);
+				print ctx "(";
+				concat ctx ", " (gen_value ctx) el;
+				print ctx ")"
+			| _, FStatic (c, {cf_name = name}) ->
+				(* Handle static method calls from any class *)
+				print ctx (v_function_name name);
+				print ctx "(";
+				concat ctx ", " (gen_value ctx) el;
+				print ctx ")"
 			| _ ->
 				(* Default function call handling *)
 				gen_value ctx e;
@@ -295,15 +307,20 @@ let rec gen_value ctx e =
 		b();
 		print ctx ctx.tabs;
 		print ctx "}"
-	| TTypeExpr _ ->
-		print ctx "// TODO: type expression"
+	| TTypeExpr t ->
+		(* This might be a function call that's been represented differently *)
+		(match t with
+		| TClassDecl c -> 
+			print ctx ("// type expression for class " ^ (String.concat "." (fst c.cl_path @ [snd c.cl_path])))
+		| _ -> print ctx "// TODO: type expression")
 	| TVar (v,eo) ->
 		print ctx "mut ";
 		print ctx (v_ident v.v_name);
 		print ctx " := ";
 		(match eo with
 		| None -> print ctx "0" (* Default initialization *)
-		| Some e -> gen_value ctx e)
+		| Some e -> 
+			gen_value ctx e)
 	| TParenthesis e ->
 		print ctx "(";
 		gen_value ctx e;
