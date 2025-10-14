@@ -323,6 +323,8 @@ and gen_value ctx e =
 		(match t with
 		| TClassDecl c -> 
 			print ctx ("// type expression for class " ^ (String.concat "." (fst c.cl_path @ [snd c.cl_path])))
+		| TEnumDecl e ->
+			print ctx ("// type expression for enum " ^ (String.concat "." (fst e.e_path @ [snd e.e_path])))
 		| _ -> print ctx "// TODO: type expression")
 	| TVar (v,eo) ->
 		print ctx "mut ";
@@ -341,6 +343,10 @@ and gen_value ctx e =
 		gen_value ctx e1;
 		print ctx " ";
 		gen_value ctx e2
+	| TArrayDecl el ->
+		print ctx "[";
+		concat ctx ", " (gen_value ctx) el;
+		print ctx "]"
 	| _ ->
 		print ctx "// TODO: ";
 		print ctx (Type.s_expr_kind e)
@@ -533,7 +539,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function
