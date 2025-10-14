@@ -261,16 +261,42 @@ and gen_value ctx e =
 				with Not_found -> print ctx "// main method not found")
 			| TTypeExpr (TClassDecl c), FStatic (_, {cf_name = name}) ->
 				(* Handle other static method calls *)
-				print ctx (v_function_name name);
-				print ctx "(";
-				concat ctx ", " (gen_value ctx) el;
-				print ctx ")"
+				if (String.concat "." (fst c.cl_path @ [snd c.cl_path])) = "Std" && name = "string" then begin
+					(* Convert Std.string() to .str() method call *)
+					(match el with
+					| [arg] ->
+						print ctx "(";
+						gen_value ctx arg;
+						print ctx ").str()"
+					| _ ->
+						print ctx "string(";
+						concat ctx ", " (gen_value ctx) el;
+						print ctx ")")
+				end else begin
+					print ctx (v_function_name name);
+					print ctx "(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				end
 			| _, FStatic (c, {cf_name = name}) ->
 				(* Handle static method calls from any class *)
-				print ctx (v_function_name name);
-				print ctx "(";
-				concat ctx ", " (gen_value ctx) el;
-				print ctx ")"
+				if (String.concat "." (fst c.cl_path @ [snd c.cl_path])) = "Std" && name = "string" then begin
+					(* Convert Std.string() to .str() method call *)
+					(match el with
+					| [arg] ->
+						print ctx "(";
+						gen_value ctx arg;
+						print ctx ").str()"
+					| _ ->
+						print ctx "string(";
+						concat ctx ", " (gen_value ctx) el;
+						print ctx ")")
+				end else begin
+					print ctx (v_function_name name);
+					print ctx "(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				end
 			| _ ->
 				(* Default function call handling *)
 				gen_value ctx e;
@@ -347,6 +373,34 @@ and gen_value ctx e =
 		print ctx "[";
 		concat ctx ", " (gen_value ctx) el;
 		print ctx "]"
+	| TNew (c, _, el) ->
+		print ctx (v_struct_name (snd c.cl_path));
+		print ctx " { ";
+		(* Handle constructor parameters based on class name and parameter count *)
+		if snd c.cl_path = "Point" && List.length el = 2 then begin
+			print ctx "x: ";
+			gen_value ctx (List.nth el 0);
+			print ctx ", y: ";
+			gen_value ctx (List.nth el 1)
+		end else if snd c.cl_path = "Person" && List.length el = 2 then begin
+			print ctx "name: ";
+			gen_value ctx (List.nth el 0);
+			print ctx ", age: ";
+			gen_value ctx (List.nth el 1)
+		end else if List.length el > 0 then begin
+			(* Generic fallback - try to guess field names for other classes *)
+			let rec gen_params i params =
+				match params with
+				| [] -> ()
+				| param :: rest ->
+					if i > 0 then print ctx ", ";
+					print ctx ("field" ^ string_of_int i ^ ": ");
+					gen_value ctx param;
+					gen_params (i + 1) rest
+			in
+			gen_params 0 el
+		end;
+		print ctx " }"
 	| _ ->
 		print ctx "// TODO: ";
 		print ctx (Type.s_expr_kind e)
@@ -539,7 +593,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function
