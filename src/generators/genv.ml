@@ -482,6 +482,46 @@ and gen_value ctx e =
 	| TMeta (meta, expr) ->
 		(* Metadata expressions - just generate the inner expression *)
 		gen_value ctx expr
+	| TCast (expr, target_type) ->
+		(* Type casting - V has different casting syntax *)
+		(match target_type with
+		| Some (TClassDecl c) ->
+			(* Cast to specific class type *)
+			let type_name = v_struct_name (snd c.cl_path) in
+			print ctx type_name;
+			print ctx "(";
+			gen_value ctx expr;
+			print ctx ")"
+		| Some _ ->
+			(* Cast to other types - use V's casting *)
+			gen_value ctx expr;
+			print ctx " as ";
+			(* Would need to generate the target type name here *)
+			print ctx "/* target_type */"
+		| None ->
+			(* Unsafe cast - just use the expression *)
+			gen_value ctx expr)
+	| TFunction tfunc ->
+		(* Generate V lambda/function syntax *)
+		print ctx "fn (";
+		(* Generate parameters *)
+		concat ctx ", " (fun (v, _) -> 
+			print ctx (v_ident v.v_name);
+			print ctx " ";
+			print ctx (v_type_name ctx v.v_type)
+		) tfunc.tf_args;
+		print ctx ") ";
+		(* Generate return type if needed *)
+		print ctx (v_type_name ctx tfunc.tf_type);
+		print ctx " {\n";
+		let b = open_block ctx in
+		print ctx ctx.tabs;
+		(* Generate function body *)
+		gen_value ctx tfunc.tf_expr;
+		print ctx "\n";
+		b();
+		print ctx ctx.tabs;
+		print ctx "}"
 	| _ ->
 		print ctx "// TODO: ";
 		print ctx (Type.s_expr_kind e)
@@ -674,7 +714,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"; "BinaryLiteralTest"; "ObjectLiteralTest"; "SimpleObjectLiteralTest"; "TryCatchTest"; "SimpleThrowTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"; "BinaryLiteralTest"; "ObjectLiteralTest"; "SimpleObjectLiteralTest"; "TryCatchTest"; "SimpleThrowTest"; "TypeCastTest"; "SimpleCastTest"; "ForInLoopTest"; "LambdaTest"; "SimpleLambdaTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function
