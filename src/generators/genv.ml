@@ -247,22 +247,128 @@ and gen_value ctx e =
 			gen_value ctx e;
 			gen_unop ctx op)
 	| TField (e,f) ->
-		let field_name_str = field_name f in
-		(* Handle Haxe string method name conversions to V equivalents *)
-		let v_field_name = match field_name_str with
-		| "toUpperCase" -> "to_upper"
-		| "toLowerCase" -> "to_lower"
-		| "length" -> "len"
-		| _ -> v_ident field_name_str
-		in
-		gen_value ctx e;
-		print ctx ".";
-		print ctx v_field_name
+		(* Check if this is a Math constant access *)
+		(match e.eexpr, f with
+		| TTypeExpr (TClassDecl {cl_path = ([],"Math")}), FStatic (_, {cf_name = const_name}) ->
+			(* Handle Math constants *)
+			(match const_name with
+			| "PI" -> print ctx "math.pi"
+			| "E" -> print ctx "math.e"
+			| "LN2" -> print ctx "math.ln2"
+			| "LN10" -> print ctx "math.ln10"
+			| "LOG2E" -> print ctx "math.log2e"
+			| "LOG10E" -> print ctx "math.log10e"
+			| "SQRT1_2" -> print ctx "math.sqrt1_2"
+			| "SQRT2" -> print ctx "math.sqrt2"
+			| "NaN" -> print ctx "math.nan()"
+			| "NEGATIVE_INFINITY" -> print ctx "-math.inf(64)"
+			| "POSITIVE_INFINITY" -> print ctx "math.inf(64)"
+			| _ -> 
+				(* Fallback for unknown Math constants *)
+				print ctx ("math." ^ (String.lowercase_ascii const_name)))
+		| _ ->
+			let field_name_str = field_name f in
+			(* Handle Haxe string method name conversions to V equivalents *)
+			let v_field_name = match field_name_str with
+			| "toUpperCase" -> "to_upper"
+			| "toLowerCase" -> "to_lower"
+			| "length" -> "len"
+			| _ -> v_ident field_name_str
+			in
+			gen_value ctx e;
+			print ctx ".";
+			print ctx v_field_name)
 	| TCall (e,el) ->
 		(* Handle different types of function calls *)
 		(match e.eexpr with
 		| TField (obj, field) ->
 			(match obj.eexpr, field with
+			| TTypeExpr (TClassDecl {cl_path = ([],"Math")}), FStatic (_, {cf_name = method_name}) -> 
+				(* Handle Math class calls - convert to V math module *)
+				(match method_name with
+				| "abs" -> 
+					print ctx "math.abs(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "min" -> 
+					print ctx "math.min(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "max" -> 
+					print ctx "math.max(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "floor" -> 
+					print ctx "int(math.floor(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx "))"
+				| "ceil" -> 
+					print ctx "int(math.ceil(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx "))"
+				| "round" -> 
+					print ctx "int(math.round(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx "))"
+				| "sqrt" -> 
+					print ctx "math.sqrt(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "pow" -> 
+					print ctx "math.pow(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "sin" -> 
+					print ctx "math.sin(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "cos" -> 
+					print ctx "math.cos(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "tan" -> 
+					print ctx "math.tan(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "asin" -> 
+					print ctx "math.asin(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "acos" -> 
+					print ctx "math.acos(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "atan" -> 
+					print ctx "math.atan(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "atan2" -> 
+					print ctx "math.atan2(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "exp" -> 
+					print ctx "math.exp(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "log" -> 
+					print ctx "math.log(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "random" -> 
+					print ctx "math.random()"
+				| "isNaN" -> 
+					print ctx "math.is_nan(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| "isFinite" -> 
+					print ctx "math.is_finite(";
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")"
+				| _ ->
+					(* Fallback for unknown Math methods *)
+					print ctx ("math." ^ v_ident method_name ^ "(");
+					concat ctx ", " (gen_value ctx) el;
+					print ctx ")")
 			| TTypeExpr (TClassDecl {cl_path = (["haxe"],"Log")}), FStatic (_, {cf_name = "trace"}) -> 
 				(* Handle trace() calls - convert to println *)
 				(match el with
@@ -774,7 +880,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"; "BinaryLiteralTest"; "ObjectLiteralTest"; "SimpleObjectLiteralTest"; "TryCatchTest"; "SimpleThrowTest"; "TypeCastTest"; "SimpleCastTest"; "ForInLoopTest"; "LambdaTest"; "SimpleLambdaTest"; "StringInterpolationTest"; "ArrayMethodsTest"; "NullCoalescingTest"; "WhileLoopTest"; "AssignmentOperatorsTest"; "TernaryOperatorTest"; "AdvancedFeaturesTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"; "BinaryLiteralTest"; "ObjectLiteralTest"; "SimpleObjectLiteralTest"; "TryCatchTest"; "SimpleThrowTest"; "TypeCastTest"; "SimpleCastTest"; "ForInLoopTest"; "LambdaTest"; "SimpleLambdaTest"; "StringInterpolationTest"; "ArrayMethodsTest"; "NullCoalescingTest"; "WhileLoopTest"; "AssignmentOperatorsTest"; "TernaryOperatorTest"; "AdvancedFeaturesTest"; "StandardMathTest"; "MathDebug"; "MathSimple"; "MathConstOnly"; "SimpleTest"; "MathConstantsDebug"; "BasicDebug"] -> true
 	| _ -> false
 
 let generate_type ctx = function
@@ -813,6 +919,7 @@ let generate com =
 	
 	print ctx "module main\n\n";
 	print ctx "// Generated by Haxe\n\n";
+	print ctx "import math\n\n";
 	
 	List.iter (generate_type ctx) com.types;
 	
