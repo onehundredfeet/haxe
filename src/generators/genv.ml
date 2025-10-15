@@ -181,11 +181,59 @@ and gen_value ctx e =
 		gen_value ctx e2;
 		print ctx "]"
 	| TBinop (op,e1,e2) ->
-		gen_value ctx e1;
-		print ctx " ";
-		gen_binop ctx op;
-		print ctx " ";
-		gen_value ctx e2
+		(match op with
+		| OpAdd ->
+			(* Check if this is string concatenation or numeric addition *)
+			let is_string_concat = 
+				let rec contains_string_type e =
+					match e.etype with
+					| TInst ({cl_path = ([], "String")}, _) -> true
+					| _ -> 
+						(match e.eexpr with
+						| TConst (TString _) -> true
+						| TBinop (OpAdd, e1, e2) -> contains_string_type e1 || contains_string_type e2
+						| _ -> false)
+				in
+				contains_string_type e1 || contains_string_type e2
+			in
+			if is_string_concat then (
+				(* Generate string concatenation with proper conversions *)
+				let rec gen_string_expr e =
+					match e.eexpr with
+					| TConst (TString s) -> print ctx ("'" ^ v_escape_string s ^ "'")
+					| TConst (TInt i) -> print ctx ("'" ^ Int32.to_string i ^ "'")
+					| TConst (TFloat f) -> print ctx ("'" ^ f ^ "'")
+					| TBinop (OpAdd, e1, e2) ->
+						gen_string_expr e1;
+						print ctx " + ";
+						gen_string_expr e2
+					| _ ->
+						(* Convert other expressions to string *)
+						match e.etype with
+						| TInst ({cl_path = ([], "String")}, _) -> gen_value ctx e
+						| _ -> 
+							print ctx "(";
+							gen_value ctx e;
+							print ctx ").str()"
+				in
+				gen_string_expr e1;
+				print ctx " + ";
+				gen_string_expr e2
+			) else (
+				(* Regular numeric addition *)
+				gen_value ctx e1;
+				print ctx " ";
+				gen_binop ctx op;
+				print ctx " ";
+				gen_value ctx e2
+			)
+		| _ ->
+			(* Other binary operations *)
+			gen_value ctx e1;
+			print ctx " ";
+			gen_binop ctx op;
+			print ctx " ";
+			gen_value ctx e2)
 	| TUnop (op,flag,e) ->
 		(match op, flag with
 		| Increment, Prefix | Decrement, Prefix ->
@@ -199,9 +247,17 @@ and gen_value ctx e =
 			gen_value ctx e;
 			gen_unop ctx op)
 	| TField (e,f) ->
+		let field_name_str = field_name f in
+		(* Handle Haxe string method name conversions to V equivalents *)
+		let v_field_name = match field_name_str with
+		| "toUpperCase" -> "to_upper"
+		| "toLowerCase" -> "to_lower"
+		| "length" -> "len"
+		| _ -> v_ident field_name_str
+		in
 		gen_value ctx e;
 		print ctx ".";
-		print ctx (v_ident (field_name f))
+		print ctx v_field_name
 	| TCall (e,el) ->
 		(* Handle different types of function calls *)
 		(match e.eexpr with
@@ -522,6 +578,10 @@ and gen_value ctx e =
 		b();
 		print ctx ctx.tabs;
 		print ctx "}"
+	| TBreak ->
+		print ctx "break"
+	| TContinue ->
+		print ctx "continue"
 	| _ ->
 		print ctx "// TODO: ";
 		print ctx (Type.s_expr_kind e)
@@ -714,7 +774,7 @@ let gen_enum ctx e =
 let should_generate_class c =
 	match c.cl_path with
 	(* Only generate user-defined test classes, exclude all standard library *)
-	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"; "BinaryLiteralTest"; "ObjectLiteralTest"; "SimpleObjectLiteralTest"; "TryCatchTest"; "SimpleThrowTest"; "TypeCastTest"; "SimpleCastTest"; "ForInLoopTest"; "LambdaTest"; "SimpleLambdaTest"] -> true
+	| ([], name) when List.mem name ["BasicTest"; "ArithmeticTest"; "StringTest"; "ConditionalTest"; "LoopTest"; "ArrayTest"; "FunctionTest"; "SimpleFunctionTest"; "ComparisonTest"; "BooleanTest"; "WhileTest"; "MathTest"; "TypeTest"; "AdvancedArrayTest"; "NestedTest"; "ClassTest"; "SwitchTest"; "SimpleFunction2Test"; "SimpleTypeTest"; "RecursionTest"; "EnumTest"; "ForInTest"; "ArrayLiteralTest"; "ObjectTest"; "Point"; "SimpleObjectTest"; "Person"; "ObjectInstantiationTest"; "SimpleSwitchTest"; "SwitchExpressionTest"; "AdvancedSwitchTest"; "BinaryLiteralTest"; "ObjectLiteralTest"; "SimpleObjectLiteralTest"; "TryCatchTest"; "SimpleThrowTest"; "TypeCastTest"; "SimpleCastTest"; "ForInLoopTest"; "LambdaTest"; "SimpleLambdaTest"; "StringInterpolationTest"; "ArrayMethodsTest"; "NullCoalescingTest"; "WhileLoopTest"; "AssignmentOperatorsTest"; "TernaryOperatorTest"; "AdvancedFeaturesTest"] -> true
 	| _ -> false
 
 let generate_type ctx = function
