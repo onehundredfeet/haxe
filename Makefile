@@ -10,7 +10,7 @@
 #
 .SUFFIXES : .ml .mli .cmo .cmi .cmx .mly
 
-INSTALL_DIR=/usr/local
+INSTALL_DIR=/opt/homebrew
 INSTALL_BIN_DIR=$(INSTALL_DIR)/bin
 INSTALL_LIB_DIR=$(INSTALL_DIR)/lib/haxe
 INSTALL_STD_DIR=$(INSTALL_DIR)/share/haxe/std
@@ -95,11 +95,22 @@ endif
 ifeq ($(SYSTEM_NAME),Mac)
 # This assumes that haxelib and neko will both be installed into INSTALL_DIR,
 # which is the case when installing using the mac installer package
-NEKO_LIB_PATH=$(INSTALL_DIR)/lib
-endif
+HAXELIB_LFLAGS= -Wl,-rpath,$(INSTALL_DIR)/lib -I$(INSTALL_DIR)/include -L$(INSTALL_DIR)/lib
 
-ifdef NEKO_LIB_PATH
-HAXELIB_LDFLAGS=-Wl,-rpath,$(NEKO_LIB_PATH)
+# Force usage of MbedTLS 2 for Haxe 5 compatibility
+MBED_DIR := $(INSTALL_DIR)/opt/mbedtls@2
+COMMON_LIB_DIR := $(INSTALL_DIR)/lib
+COMMON_INCLUDE_DIR := $(INSTALL_DIR)/include
+
+# Prepend paths to ensure they take priority over system-wide MbedTLS 3
+export C_INCLUDE_PATH := $(MBED_DIR)/include:$(C_INCLUDE_PATH):$(COMMON_INCLUDE_DIR)
+export LIBRARY_PATH   := $(MBED_DIR)/lib:$(LIBRARY_PATH):$(COMMON_LIB_DIR)
+
+# Also set standard flags for other build parts
+export LDFLAGS  := -L$(MBED_DIR)/lib -L$(COMMON_LIB_DIR) $(LDFLAGS)
+export CPPFLAGS := -I$(MBED_DIR)/include -I$(COMMON_INCLUDE_DIR) $(CPPFLAGS)
+
+NEKO_LIB_PATH=$(INSTALL_DIR)/lib
 endif
 
 haxelib_unix:
@@ -135,6 +146,9 @@ uninstall:
 
 opam_install:
 	opam install ocamlfind dune --yes
+
+opam_init:
+	opam init
 
 haxe_deps:
 	opam pin add haxe . --no-action
